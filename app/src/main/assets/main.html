@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>网速测试</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+      * {
+        user-select: none;
+      }
+
+      :root {
+        --status-bar-height: 0px;
+        --navigation-bar-height: 0px;
+      }
+
+      body {
+        font-family: "Arial", sans-serif;
+        margin: 0;
+        padding: 20px;
+        background-color: #f5f6fa;
+        padding-top: var(--status-bar-height);
+        padding-bottom: var(--navigation-bar-height);
+      }
+
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding-top: 10px;
+      }
+
+      .card {
+        background: white;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+
+      .network-info {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 15px;
+      }
+
+      .info-item {
+        padding: 15px;
+        background: #f8f9fe;
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .info-item strong {
+        color: #666;
+        font-size: 14px;
+      }
+
+      .info-item span {
+        color: #2d3436;
+        font-size: 16px;
+        font-weight: 500;
+      }
+
+      .speedometer {
+        width: 300px;
+        height: 200px;
+        margin: 0 auto;
+        position: relative;
+        margin-top: -20px;
+      }
+
+      .speed-value {
+        position: absolute;
+        top: 65%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 2em;
+        font-weight: bold;
+        width: 150px;
+        text-align: center;
+        line-height: 1.2;
+        margin: 0;
+        padding: 0;
+        color: #666;
+      }
+
+      .test-button {
+        display: block;
+        width: 200px;
+        margin: 20px auto;
+        padding: 15px;
+        background: #4834d4;
+        color: white;
+        border: none;
+        border-radius: 25px;
+        font-size: 16px;
+        cursor: pointer;
+        transition: background 0.3s;
+      }
+
+      .test-button:hover {
+        background: #686de0;
+      }
+
+      .history-button {
+        background: #2d3436;
+      }
+
+      #historyPanel {
+        display: none;
+      }
+
+      .history-item {
+        padding: 15px;
+        border-bottom: 1px solid #eee;
+      }
+
+      .history-item > div {
+        line-height: 1.5;
+      }
+
+      .clear-history-button {
+        background: #e74c3c;
+        margin-top: 15px;
+        width: 150px;
+        padding: 10px;
+        margin-bottom: 0;
+      }
+
+      .clear-history-button:hover {
+        background: #c0392b;
+      }
+
+      #historyPanel {
+        margin-top: 20px;
+      }
+
+      .test-button.history-button {
+        background: #2d3436;
+        margin-top: 10px;
+      }
+
+      .test-button.history-button:hover {
+        background: #636e72;
+      }
+
+      .test-button.testing {
+        background: #e74c3c;
+      }
+
+      .timer {
+        text-align: center;
+        margin-top: 10px;
+        font-size: 14px;
+        color: #666;
+      }
+
+      #speedGauge {
+        margin: 0 auto;
+      }
+
+      * {
+        -webkit-touch-callout: none; /* iOS Safari */
+        -webkit-user-select: none; /* Safari */
+        -khtml-user-select: none; /* Konqueror HTML */
+        -moz-user-select: none; /* Firefox */
+        -ms-user-select: none; /* Internet Explorer/Edge */
+        user-select: none; /* Non-prefixed version */
+        -webkit-tap-highlight-color: transparent; /* 移除移动端点击高亮 */
+      }
+
+      /* 如果有需要允许选择的特定元素，可以单独设置 */
+      .selectable {
+        -webkit-user-select: text;
+        -khtml-user-select: text;
+        -moz-user-select: text;
+        -ms-user-select: text;
+        user-select: text;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="card">
+        <div class="network-info">
+          <div class="info-item">
+            <strong>网络类型</strong>
+            <span id="networkType">WiFi</span>
+          </div>
+          <div class="info-item">
+            <strong>IP地址</strong>
+            <span id="ipAddress">--</span>
+          </div>
+          <div class="info-item">
+            <strong>网络延迟</strong>
+            <span id="networkLatency">--</span>
+          </div>
+          <div class="info-item">
+            <strong>网络抖动</strong>
+            <span id="networkJitter">--</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="speedometer">
+          <canvas id="speedGauge"></canvas>
+          <div class="speed-value">未测速</div>
+        </div>
+        <button class="test-button" id="testButton" onclick="toggleSpeedTest()">
+          开始测速
+        </button>
+        <div class="timer" id="timer"></div>
+      </div>
+
+      <div class="card">
+        <canvas id="speedChart"></canvas>
+      </div>
+
+      <button
+        id="historyButton"
+        class="test-button history-button"
+        onclick="toggleHistory()"
+        style="display: none"
+      >
+        查看历史记录
+      </button>
+
+      <div id="historyPanel" class="card" style="display: none">
+        <div id="historyList"></div>
+        <button
+          id="clearHistoryButton"
+          class="test-button clear-history-button"
+          onclick="clearHistory()"
+        >
+          清空历史记录
+        </button>
+      </div>
+    </div>
+
+    <script>
+      // 初始化仪表盘
+      const gaugeCtx = document.getElementById("speedGauge").getContext("2d");
+      const speedGauge = new Chart(gaugeCtx, {
+        type: "doughnut",
+        data: {
+          datasets: [
+            {
+              data: [0, 100],
+              backgroundColor: ["#4834d4", "#eee"],
+              borderWidth: 0,
+            },
+          ],
+        },
+        options: {
+          circumference: 180,
+          rotation: -90,
+          cutout: "80%",
+          plugins: {
+            legend: {
+              display: false,
+            },
+            tooltip: {
+              enabled: false,
+            },
+            afterDraw: (chart) => {
+              const {
+                ctx,
+                chartArea: { top, bottom, left, right, width, height },
+              } = chart;
+              ctx.save();
+
+              ctx.font = "12px Arial";
+              ctx.fillStyle = "#666";
+              ctx.textAlign = "center";
+
+              ctx.fillText("0", left + width * 0.1, top + height * 0.9);
+
+              ctx.fillText("25MB", left + width * 0.5, top + height * 0.7);
+
+              ctx.fillText("50MB", left + width * 0.9, top + height * 0.9);
+
+              ctx.restore();
+            },
+          },
+          animation: {
+            duration: 200,
+          },
+        },
+      });
+
+      // 初始化速度图表
+      const chartCtx = document.getElementById("speedChart").getContext("2d");
+      const speedChart = new Chart(chartCtx, {
+        type: "line",
+        data: {
+          labels: [],
+          datasets: [
+            {
+              label: "下载速度 (Mbps)",
+              data: [],
+              borderColor: "#4834d4",
+              tension: 0.4,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: {
+              beginAtZero: true,
+            },
+          },
+        },
+      });
+
+      let testInterval = null;
+      const TEST_DURATION = 10; // 测试时长（秒）
+
+      function toggleSpeedTest() {
+        const button = document.getElementById("testButton");
+        const timer = document.getElementById("timer");
+        const historyButton = document.getElementById("historyButton");
+
+        if (testInterval) {
+          Android.stopSpeedTest();
+          testInterval = null;
+          button.textContent = "开始测速";
+          button.classList.remove("testing");
+          timer.textContent = "";
+          return;
+        }
+
+        // 开始测速前先测试网络状态
+        if (typeof Android !== "undefined") {
+          Android.measureNetworkQuality();
+        }
+
+        // 重置历史记录按钮状态
+        historyButton.textContent = "查看历史记录";
+        document.getElementById("historyPanel").style.display = "none";
+
+        // 开始测速
+        button.textContent = "停止测速";
+        button.classList.add("testing");
+
+        // 重置图表
+        speedChart.data.labels = [];
+        speedChart.data.datasets[0].data = [];
+        speedChart.update();
+
+        // 重置仪表盘
+        speedGauge.data.datasets[0].data = [0, 100];
+        speedGauge.update();
+        document.querySelector(".speed-value").textContent = "未测速";
+
+        testInterval = true;
+        Android.startSpeedTest();
+      }
+
+      // 接收测速更新
+      function updateSpeedTest(bytesPerSecond, progress, formattedSpeed) {
+        console.log("Speed update:", formattedSpeed, "Progress:", progress);
+
+        // 更新仪表盘
+        const maxSpeed = 50 * 1024 * 1024; // 50MB/s 作为最大值
+        const percentage = Math.min((bytesPerSecond / maxSpeed) * 100, 100);
+        speedGauge.data.datasets[0].data = [percentage, 100 - percentage];
+        speedGauge.update("none"); // 使用 'none' 动画模式使更新更流畅
+        document.querySelector(".speed-value").innerHTML = formattedSpeed;
+
+        // 更新图表
+        speedChart.data.labels.push(speedChart.data.labels.length);
+        speedChart.data.datasets[0].data.push(bytesPerSecond);
+        speedChart.update("none");
+
+        // 更新倒计时
+        document.getElementById("timer").textContent = `测试进度：${progress}%`;
+      }
+
+      // 测试完成
+      function completeSpeedTest(averageSpeed, formattedSpeed) {
+        console.log(
+          "Test complete:",
+          formattedSpeed,
+          "Average speed:",
+          averageSpeed
+        );
+
+        testInterval = null;
+        const button = document.getElementById("testButton");
+        button.textContent = "开始测速";
+        button.classList.remove("testing");
+        document.getElementById("timer").textContent = "";
+
+        // 更新仪表盘显示平均速度
+        const maxSpeed = 50 * 1024 * 1024; // 50MB/s 作为最大值
+        const percentage = Math.min((averageSpeed / maxSpeed) * 100, 100);
+        speedGauge.data.datasets[0].data = [percentage, 100 - percentage];
+        speedGauge.update("none");
+        document.querySelector(".speed-value").innerHTML = formattedSpeed;
+
+        // 保存历史记录
+        saveHistory([
+          {
+            speed: averageSpeed,
+            formatted: formattedSpeed,
+          },
+        ]);
+
+        // 更新历史按钮和面板状态
+        checkHistoryButton();
+        if (document.getElementById("historyPanel").style.display === "block") {
+          updateHistoryList();
+        }
+      }
+
+      // 测试错误
+      function errorSpeedTest(message) {
+        console.log("Test error:", message);
+
+        testInterval = null;
+        const button = document.getElementById("testButton");
+        button.textContent = "开始测速";
+        button.classList.remove("testing");
+        document.getElementById("timer").textContent = `错误：${message}`;
+      }
+
+      // 保存历史记录
+      function saveHistory(speeds) {
+        const speed = speeds[0].speed;
+        const formatted = speeds[0].formatted.replace(/<br\s*\/?>/g, ""); // 移除 <br /> 标签
+        const date = new Date().toLocaleString("zh-CN", {
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        });
+
+        let history = [];
+        try {
+          history = JSON.parse(localStorage.getItem("speedHistory") || "[]");
+          history.push({
+            date,
+            speed,
+            formatted,
+          });
+          localStorage.setItem("speedHistory", JSON.stringify(history));
+        } catch (e) {
+          console.error("Error saving history:", e);
+        }
+      }
+
+      // 显示/隐藏历史记录
+      function toggleHistory() {
+        const panel = document.getElementById("historyPanel");
+        const button = document.getElementById("historyButton");
+
+        if (panel.style.display === "none") {
+          panel.style.display = "block";
+          button.textContent = "隐藏历史记录";
+          updateHistoryList();
+        } else {
+          panel.style.display = "none";
+          button.textContent = "查看历史记录";
+        }
+      }
+
+      // 更新历史列表
+      function updateHistoryList() {
+        let history = [];
+        try {
+          history = JSON.parse(localStorage.getItem("speedHistory") || "[]");
+        } catch (e) {
+          console.error("Error loading history:", e);
+        }
+
+        const historyList = document.getElementById("historyList");
+
+        if (!history || history.length === 0) {
+          historyList.innerHTML =
+            '<div class="history-item">暂无测速记录</div>';
+          document.getElementById("clearHistoryButton").style.display = "none";
+        } else {
+          historyList.innerHTML = history
+            .reverse()
+            .map(
+              (item) => `
+                    <div class="history-item">
+                        <div>测试时间：${item.date}</div>
+                        <div>平均速度：${item.formatted}</div>
+                    </div>
+                `
+            )
+            .join("");
+          document.getElementById("clearHistoryButton").style.display = "block";
+        }
+      }
+
+      // 清空历史记录
+      function clearHistory() {
+        if (confirm("确定要清空所有历史记录吗？")) {
+          localStorage.removeItem("speedHistory");
+          updateHistoryList();
+          // 如果没有历史记录，隐藏历史按钮
+          checkHistoryButton();
+        }
+      }
+
+      // 检查是否显示历史按钮
+      function checkHistoryButton() {
+        const history = JSON.parse(
+          localStorage.getItem("speedHistory") || "[]"
+        );
+        const button = document.getElementById("historyButton");
+        button.style.display = history.length > 0 ? "block" : "none";
+
+        // 如果当前显示着历史面板但没有历史记录，则隐藏面板
+        if (history.length === 0) {
+          document.getElementById("historyPanel").style.display = "none";
+        }
+      }
+
+      // 定义一个全局对象来存储所有的网络相关方法
+      window.NetworkManager = {
+        // 更新网络信息
+        updateNetworkInfo: function (type, ip, latency, jitter) {
+          document.getElementById("networkType").textContent = type;
+          document.getElementById("ipAddress").textContent = ip;
+          document.getElementById("networkLatency").textContent =
+            latency >= 0 ? `${latency}毫秒` : "--";
+          document.getElementById("networkJitter").textContent =
+            jitter >= 0 ? `${jitter}毫秒` : "--";
+        },
+
+        // 初始化网络信息
+        initNetworkInfo: function () {
+          if (typeof Android !== "undefined") {
+            const networkInfo = JSON.parse(Android.getNetworkInfo());
+            this.updateNetworkInfo(
+              networkInfo.type,
+              networkInfo.ip,
+              networkInfo.latency,
+              networkInfo.jitter
+            );
+          }
+        },
+
+        // 更新延迟信息
+        updateLatency: function (latency) {
+          document.getElementById(
+            "networkLatency"
+          ).textContent = `${latency}ms`;
+        },
+      };
+
+      // 初始化系统边距
+      let systemInsets = null;
+
+      function initSystemInsets() {
+        if (typeof Android !== "undefined") {
+          systemInsets = JSON.parse(Android.getSystemInsets());
+          document.documentElement.style.setProperty(
+            "--status-bar-height",
+            `${systemInsets.statusBarHeight}px`
+          );
+          document.documentElement.style.setProperty(
+            "--navigation-bar-height",
+            `${systemInsets.navigationBarHeight}px`
+          );
+        }
+      }
+
+      // 页面加载完成后初始化
+      document.addEventListener("DOMContentLoaded", function () {
+        NetworkManager.initNetworkInfo();
+        initSystemInsets();
+        checkHistoryButton();
+      });
+    </script>
+  </body>
+</html>
