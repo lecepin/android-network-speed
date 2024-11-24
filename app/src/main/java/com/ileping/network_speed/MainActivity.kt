@@ -35,6 +35,24 @@ class MainActivity : AppCompatActivity() {
     private lateinit var connectivityManager: ConnectivityManager
     private lateinit var networkCallback: ConnectivityManager.NetworkCallback
     private lateinit var webAppInterface: WebAppInterface
+    
+    private var lastBackPressTime: Long = 0
+    
+    override fun onBackPressed() {
+        if (webView.canGoBack()) {
+            webView.goBack()
+            return
+        }
+        
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - lastBackPressTime > 2000) {
+            Toast.makeText(this, "再按一次退出应用", Toast.LENGTH_SHORT).show()
+            lastBackPressTime = currentTime
+        } else {
+            super.onBackPressed()
+            finish()
+        }
+    }
 
     inner class WebAppInterface(private val activity: Activity) {
         private val speedTestManager = SpeedTestManager()
